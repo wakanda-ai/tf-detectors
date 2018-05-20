@@ -1,7 +1,11 @@
 # tf-detectors
 Deep-Learning Based Detection Models for Practical Usages implemented in Tensorflow.
 
-## Models
+## Pretrained Weights
+
+To be updated
+
+## Architectures
 
 ### SSD: Single shot multibox detector
 
