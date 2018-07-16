@@ -4,7 +4,7 @@ import glob
 import math
 import hashlib
 import logging
-import utils.dataset_util as dataset_util
+import tf_detectors.utils.dataset_util as dataset_util
 import tensorflow as tf
 
 from lxml import etree
@@ -12,7 +12,7 @@ from PIL import Image
 
 """
 Usage : python vid_2015_to_tfrecord.py \
-        --data_dir=/path/to/VID2015_dataset/ILSVRC \
+        --root_dir=/path/to/VID2015_dataset/ILSVRC \
         --output_path=/tmp/vid2015_tfrecord
 
 XML format(example):
@@ -42,7 +42,7 @@ XML format(example):
 """
 
 flags = tf.app.flags
-flags.DEFINE_string('data_dir', '', 'Root directory to raw VID 2015 dataset.')
+flags.DEFINE_string('root_dir', '', 'Root directory to raw VID 2015 dataset.')
 flags.DEFINE_string('set', 'train', 'Convert training set, validation set.')
 flags.DEFINE_string('output_path', './data/VID2015', 'Path to output TFRecord')
 flags.DEFINE_integer('start_shard', 0, 'Start index of TFRcord files')
@@ -52,7 +52,8 @@ FLAGS = flags.FLAGS
 
 SETS = ['train', 'val', 'test']
 
-def gen_shard(examples_list, annotations_dir, out_filename):
+def gen_shard(examples_list, annotations_dir, out_filename,
+        root_dir, _set):
     writer = tf.python_io.TFRecordWriter(out_filename)
     for indx, example in enumerate(examples_list):
         xml_pattern = os.path.join(annotations_dir, example + '/*.xml')
@@ -65,12 +66,12 @@ def gen_shard(examples_list, annotations_dir, out_filename):
             xml = etree.fromstring(xml_str)
             dic = dataset_util.recursive_parse_xml_to_dict(xml)['annotation']
             dicts.append(dic)
-        tf_example = dicts_to_tf_example(dicts)
+        tf_example = dicts_to_tf_example(dicts, root_dir, _set)
         writer.write(tf_example.SerializeToString())
     writer.close()
     return
 
-def dicts_to_tf_example(dicts):
+def dicts_to_tf_example(dicts, root_dir, _set):
     """ Convert XML derived dict to tf.Example proto.
     """
     # Non sequential data
@@ -79,8 +80,8 @@ def dicts_to_tf_example(dicts):
     width = int(dicts[0]['size']['width'])
 
     # Get image paths
-    imgs_dir = os.path.join(FLAGS.data_dir,
-                            'Data/VID/{}'.format(FLAGS.set),
+    imgs_dir = os.path.join(root_dir,
+                            'Data/VID/{}'.format(_set),
                             folder)
     imgs_path = glob.glob(imgs_dir + '/*.JPEG')
 
@@ -166,15 +167,15 @@ def dicts_to_tf_example(dicts):
     return tf_example
 
 def main(_):
-    data_dir = FLAGS.data_dir
+    root_dir = FLAGS.root_dir
 
     if FLAGS.set not in SETS:
         raise ValueError('set must be in : {}'.format(SETS))
 
     # Read Example list files
-    logging.info('Reading from VID 2015 dataset. ({})'.format(data_dir))
+    logging.info('Reading from VID 2015 dataset. ({})'.format(root_dir))
     list_file_pattern = 'ImageSets/VID/{}*.txt'.format(FLAGS.set)
-    examples_paths = glob.glob(os.path.join(data_dir, list_file_pattern))
+    examples_paths = glob.glob(os.path.join(root_dir, list_file_pattern))
     examples_list = []
     for examples_path in examples_paths:
         examples_list.extend(dataset_util.read_examples_list(examples_path))
@@ -187,7 +188,7 @@ def main(_):
     num_digits = math.ceil(math.log10(num_shards-1))
     shard_format = '%0'+ ('%d'%num_digits) + 'd'
     examples_per_shard = int(math.ceil(len(examples_list)/float(num_shards)))
-    annotations_dir = os.path.join(data_dir,
+    annotations_dir = os.path.join(root_dir,
                                    'Annotations/VID/{}'.format(FLAGS.set))
     # Generate each shard
     for i in range(start_shard, num_shards):
@@ -198,7 +199,8 @@ def main(_):
         if os.path.isfile(out_filename): # Don't recreate data if restarting
             continue
         print (str(i)+'of'+str(num_shards)+'['+str(start)+':'+str(end),']'+out_filename)
-        gen_shard(examples_list[start:end], annotations_dir, out_filename)
+        gen_shard(examples_list[start:end], annotations_dir, out_filename,
+                root_dir, FLAGS.set)
     # Clean up writing last shard
     start = num_shards * examples_per_shard
     out_filename = os.path.join(FLAGS.output_path,
