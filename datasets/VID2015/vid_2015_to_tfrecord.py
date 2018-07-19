@@ -136,13 +136,14 @@ def dicts_to_tf_example(dicts, root_dir, _set):
         ymins.append(dataset_util.float_list_feature(ymin))
         xmaxs.append(dataset_util.float_list_feature(xmax))
         ymaxs.append(dataset_util.float_list_feature(ymax))
+        names.append(dataset_util.bytes_list_feature(name))
         occludeds.append(dataset_util.int64_list_feature(occluded))
         generateds.append(dataset_util.int64_list_feature(generated))
 
     # Non sequential features
     context = tf.train.Features(feature={
         'video/folder': dataset_util.bytes_feature(folder.encode('utf8')),
-        'video/frame_numbers': dataset_util.int64_feature(len(imgs_path)),
+        'video/frame_number': dataset_util.int64_feature(len(imgs_path)),
         'video/height': dataset_util.int64_feature(height),
         'video/width': dataset_util.int64_feature(width),
         })
