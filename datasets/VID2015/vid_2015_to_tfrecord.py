@@ -202,12 +202,6 @@ def main(_):
         print (str(i)+'of'+str(num_shards)+'['+str(start)+':'+str(end),']'+out_filename)
         gen_shard(examples_list[start:end], annotations_dir, out_filename,
                 root_dir, FLAGS.set)
-    # Clean up writing last shard
-    start = num_shards * examples_per_shard
-    out_filename = os.path.join(FLAGS.output_path,
-            'VID_2015-'+(shard_format % num_shards)+'.tfrecord')
-    print (str(i)+'of',str(num_shards)+'['+str(start)+':]'+out_filename)
-    gen_shard(examples_list[start:], annotations_dir, out_filename)
     return
 
 if __name__ == '__main__':
