@@ -36,7 +36,7 @@ class CreateVID2015TFRecordTest(tf.test.TestCase):
         os.makedirs(os.path.join(data_dir, example_path), exist_ok=True)
 
         # Video information
-        frame_number = 20
+        frame_number = 348
         height, width = 256, 256
         expectation = {'context_features':{}, 'sequence_features':{}}
         expectation['context_features'] = {'video/folder':example_path.encode('utf8'),
@@ -111,9 +111,10 @@ class CreateVID2015TFRecordTest(tf.test.TestCase):
             expectation['sequence_features']['image/object/bbox/ymin'].append(float(ymin)/height)
 
         # Make temporary tfrecord file(gen_shard)
+        #out_filename = './example/example.tfrecord'
         out_filename = os.path.join(test_dir, 'test.tfrecord')
         gen_shard([example_path], annotation_dir, out_filename,
-                test_dir, 'test')
+                  test_dir, 'test')
 
         # Parse temporary tfrecord file
         data_files = tf.gfile.Glob([out_filename])
@@ -132,13 +133,13 @@ class CreateVID2015TFRecordTest(tf.test.TestCase):
                 'image/sources': tf.FixedLenSequenceFeature([], dtype=tf.string),
                 'image/key/sha256': tf.FixedLenSequenceFeature([], dtype=tf.string),
                 'image/format': tf.FixedLenSequenceFeature([], dtype=tf.string),
-                'image/object/bbox/xmin': tf.FixedLenSequenceFeature([], dtype=tf.float32),
-                'image/object/bbox/xmax': tf.FixedLenSequenceFeature([], dtype=tf.float32),
-                'image/object/bbox/ymin': tf.FixedLenSequenceFeature([], dtype=tf.float32),
-                'image/object/bbox/ymax': tf.FixedLenSequenceFeature([], dtype=tf.float32),
-                'image/object/name': tf.FixedLenSequenceFeature([], dtype=tf.string),
-                'image/object/occluded': tf.FixedLenSequenceFeature([], dtype=tf.int64),
-                'image/object/generated': tf.FixedLenSequenceFeature([], dtype=tf.int64),
+                'image/object/bbox/xmin': tf.VarLenFeature(dtype=tf.float32),
+                'image/object/bbox/xmax': tf.VarLenFeature(dtype=tf.float32),
+                'image/object/bbox/ymin': tf.VarLenFeature(dtype=tf.float32),
+                'image/object/bbox/ymax': tf.VarLenFeature(dtype=tf.float32),
+                'image/object/name': tf.VarLenFeature(dtype=tf.string),
+                'image/object/occluded': tf.VarLenFeature(dtype=tf.int64),
+                'image/object/generated': tf.VarLenFeature(dtype=tf.int64),
                 }
         context_parsed, sequence_parsed = tf.parse_single_sequence_example(
                 serialized=example,
@@ -164,22 +165,23 @@ class CreateVID2015TFRecordTest(tf.test.TestCase):
                                  sorted(list(sp[key])))
 
 
-# Convert tensor to image format and draw bouding box on it
+## Convert tensor to image format and draw bouding box on it
 #image = tf.image.decode_jpeg(sequence_parsed['image/encoded'][0], channels=3)
 #image = tf.image.convert_image_dtype(image, tf.float32)
 #image = tf.expand_dims(image, 0) # [batch, height, width, 3]
-#bounding_box = [[[
-#                    sequence_parsed['image/object/bbox/ymin'][0],
-#                    sequence_parsed['image/object/bbox/xmin'][0],
-#                    sequence_parsed['image/object/bbox/ymax'][0],
-#                    sequence_parsed['image/object/bbox/xmax'][0],
-#               ]]] # [batch, #_of_bb, 4]
+#bounding_box = tf.stack([
+#                    tf.sparse_tensor_to_dense(sequence_parsed['image/object/bbox/ymin'])[0],
+#                    tf.sparse_tensor_to_dense(sequence_parsed['image/object/bbox/xmin'])[0],
+#                    tf.sparse_tensor_to_dense(sequence_parsed['image/object/bbox/ymax'])[0],
+#                    tf.sparse_tensor_to_dense(sequence_parsed['image/object/bbox/xmax'])[0],
+#               ], axis=-1) # [batch, #_of_bb, 4)
+#bounding_box = tf.expand_dims(bounding_box, 0)
+#bounding_box = tf.Print(bounding_box, [bounding_box], summarize=1000)
 #image_bb = tf.image.draw_bounding_boxes(image, bounding_box)
 #tf.summary.image('image', image)
 #tf.summary.image('image_with_bounding_box', image_bb)
-
-
-# Launch tensorboard
+#
+## Launch tensorboard
 #global_step = tf.train.get_or_create_global_step()
 #summaries = tf.get_collection(tf.GraphKeys.SUMMARIES)
 #summary_op = tf.summary.merge(summaries)
