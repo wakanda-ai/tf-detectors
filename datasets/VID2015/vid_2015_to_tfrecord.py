@@ -57,7 +57,7 @@ def gen_shard(examples_list, annotations_dir, out_filename,
     writer = tf.python_io.TFRecordWriter(out_filename)
     for indx, example in enumerate(examples_list):
         xml_pattern = os.path.join(annotations_dir, example + '/*.xml')
-        xml_files = glob.glob(xml_pattern)
+        xml_files = sorted(glob.glob(xml_pattern))
         dicts = []
         ## process per single frame
         for xml_file in xml_files:
@@ -83,7 +83,7 @@ def dicts_to_tf_example(dicts, root_dir, _set):
     imgs_dir = os.path.join(root_dir,
                             'Data/VID/{}'.format(_set),
                             folder)
-    imgs_path = glob.glob(imgs_dir + '/*.JPEG')
+    imgs_path = sorted(glob.glob(imgs_dir + '/*.JPEG'))
 
     # Frames Info (image)
     filenames = []
@@ -108,9 +108,11 @@ def dicts_to_tf_example(dicts, root_dir, _set):
         if image.format != 'JPEG':
             raise ValueError('Image format not JPEG')
         key = hashlib.sha256(encoded_jpg).hexdigest()
+
         ## validation
         assert int(data['size']['height']) == height
         assert int(data['size']['width']) == width
+
         ## iterate objects
         xmin, ymin = [], []
         xmax, ymax = [], []
@@ -126,6 +128,15 @@ def dicts_to_tf_example(dicts, root_dir, _set):
                 name.append(obj['name'].encode('utf8'))
                 occluded.append(int(obj['occluded']))
                 generated.append(int(obj['generated']))
+        else:
+            xmin.append(float(-1))
+            ymin.append(float(-1))
+            xmax.append(float(-1))
+            ymax.append(float(-1))
+            name.append('NoObject'.encode('utf8'))
+            occluded.append(0)
+            generated.append(0)
+
         ## append tf_feature to list
         filenames.append(dataset_util.bytes_feature(data['filename'].encode('utf8')))
         encodeds.append(dataset_util.bytes_feature(encoded_jpg))
@@ -176,7 +187,7 @@ def main(_):
     # Read Example list files
     logging.info('Reading from VID 2015 dataset. ({})'.format(root_dir))
     list_file_pattern = 'ImageSets/VID/{}*.txt'.format(FLAGS.set)
-    examples_paths = glob.glob(os.path.join(root_dir, list_file_pattern))
+    examples_paths = sorted(glob.glob(os.path.join(root_dir, list_file_pattern)))
     examples_list = []
     for examples_path in examples_paths:
         examples_list.extend(dataset_util.read_examples_list(examples_path))
@@ -186,7 +197,7 @@ def main(_):
     # Sharding
     start_shard = FLAGS.start_shard
     num_shards = FLAGS.num_shards
-    num_digits = math.ceil(math.log10(num_shards-1))
+    num_digits = math.ceil(math.log10(max(num_shards-1,2)))
     shard_format = '%0'+ ('%d'%num_digits) + 'd'
     examples_per_shard = int(math.ceil(len(examples_list)/float(num_shards)))
     annotations_dir = os.path.join(root_dir,
