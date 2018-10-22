@@ -47,27 +47,44 @@ flags.DEFINE_string('set', 'train', 'Convert training set, validation set.')
 flags.DEFINE_string('output_path', './data/VID2015', 'Path to output TFRecord')
 flags.DEFINE_integer('start_shard', 0, 'Start index of TFRcord files')
 flags.DEFINE_integer('num_shards', 10, 'The number of TFRcord files')
+flags.DEFINE_integer('num_frames', 10, 'The number of frame to use')
 flags.DEFINE_integer('num_examples', -1, 'The number of video to convert to TFRecord file')
 FLAGS = flags.FLAGS
 
 SETS = ['train', 'val', 'test']
+MAX_INTERVAL = 5
+
+def sample_frames(xml_files):
+    samples_size = (len(xml_files) - 1) // FLAGS.num_frames + 1
+    samples = []
+    for s in range(samples_size):
+        start = FLAGS.num_frames * s
+        end   = FLAGS.num_frames * (s+1)
+        sample = xml_files[start:end]
+        while len(sample) < FLAGS.num_frames:
+            sample.append(sample[-1])
+        samples.append(sample)
+    return samples
 
 def gen_shard(examples_list, annotations_dir, out_filename,
         root_dir, _set):
     writer = tf.python_io.TFRecordWriter(out_filename)
     for indx, example in enumerate(examples_list):
+        ## sample frames
         xml_pattern = os.path.join(annotations_dir, example + '/*.xml')
         xml_files = sorted(glob.glob(xml_pattern))
-        dicts = []
-        ## process per single frame
-        for xml_file in xml_files:
-            with tf.gfile.GFile(xml_file, 'r') as fid:
-                xml_str = fid.read()
-            xml = etree.fromstring(xml_str)
-            dic = dataset_util.recursive_parse_xml_to_dict(xml)['annotation']
-            dicts.append(dic)
-        tf_example = dicts_to_tf_example(dicts, root_dir, _set)
-        writer.write(tf_example.SerializeToString())
+        samples = sample_frames(xml_files)
+        for sample in samples:
+            dicts = []
+            for xml_file in sample:
+            ## process per single xml
+                with tf.gfile.GFile(xml_file, 'r') as fid:
+                    xml_str = fid.read()
+                xml = etree.fromstring(xml_str)
+                dic = dataset_util.recursive_parse_xml_to_dict(xml)['annotation']
+                dicts.append(dic)
+            tf_example = dicts_to_tf_example(dicts, root_dir, _set)
+            writer.write(tf_example.SerializeToString())
     writer.close()
     return
 
@@ -76,14 +93,17 @@ def dicts_to_tf_example(dicts, root_dir, _set):
     """
     # Non sequential data
     folder = dicts[0]['folder']
+    filenames = [dic['filename'] for dic in dicts]
     height = int(dicts[0]['size']['height'])
     width = int(dicts[0]['size']['width'])
 
-    # Get image paths
+#    # Get image paths
     imgs_dir = os.path.join(root_dir,
                             'Data/VID/{}'.format(_set),
                             folder)
-    imgs_path = sorted(glob.glob(imgs_dir + '/*.JPEG'))
+    imgs_path = sorted([os.path.join(imgs_dir, filename) + '.JPEG'
+                        for filename in filenames])
+            #glob.glob(imgs_dir + '/*.JPEG'))
 
     # Frames Info (image)
     filenames = []
