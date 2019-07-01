@@ -10,6 +10,39 @@ import tensorflow as tf
 from lxml import etree
 from PIL import Image
 
+class_dict = {
+    'n02691156': 1,
+    'n02419796': 2,
+    'n02131653': 3, 
+    'n02834778': 4, 
+    'n01503061': 5, 
+    'n02924116': 6, 
+    'n02958343': 7, 
+    'n02402425': 8, 
+    'n02084071': 9, 
+    'n02121808': 10, 
+    'n02503517': 11, 
+    'n02118333': 12, 
+    'n02510455': 13, 
+    'n02342885': 14, 
+    'n02374451': 15, 
+    'n02129165': 16,
+    'n01674464': 17, 
+    'n02484322': 18, 
+    'n03790512': 19, 
+    'n02324045': 20, 
+    'n02509815': 21, 
+    'n02411705': 22, 
+    'n01726692': 23,
+    'n02355227': 24, 
+    'n02129604': 25,
+    'n04468005': 26, 
+    'n01662784': 27, 
+    'n04530566': 28, 
+    'n02062744': 29, 
+    'n02391049': 30
+}
+
 """
 Usage : python vid_2015_to_tfrecord.py \
         --root_dir=/path/to/VID2015_dataset/ILSVRC \
@@ -83,8 +116,9 @@ def gen_shard(examples_list, annotations_dir, out_filename,
                 xml = etree.fromstring(xml_str)
                 dic = dataset_util.recursive_parse_xml_to_dict(xml)['annotation']
                 dicts.append(dic)
-            tf_example = dicts_to_tf_example(dicts, root_dir, _set)
-            writer.write(tf_example.SerializeToString())
+            #tf_example = dicts_to_tf_example(dicts, root_dir, _set)
+            dicts_to_tf_example(dicts, root_dir, _set)
+            #writer.write(tf_example.SerializeToString())
     writer.close()
     return
 
@@ -105,21 +139,24 @@ def dicts_to_tf_example(dicts, root_dir, _set):
                         for filename in filenames])
             #glob.glob(imgs_dir + '/*.JPEG'))
 
-    # Frames Info (image)
-    filenames = []
-    encodeds = []
-    sources = []
-    keys = []
-    formats = []
-    # Frames Info (objects)
-    xmins, ymins = [], []
-    xmaxs, ymaxs = [], []
-    names = []
-    occludeds = []
-    generateds = []
-
     # Iterate frames
+    index = 0
     for data, img_path in zip(dicts, imgs_path):
+        if index % 4 == 0:
+            # Frames Info (image)
+            filenames = []
+            encodeds = []
+            sources = []
+            keys = []
+            formats = []
+            # Frames Info (objects)
+            xmins, ymins = [], []
+            xmaxs, ymaxs = [], []
+            names = []
+            occludeds = []
+            generateds = []
+
+        index += 1     
         ## open single frame
         with tf.gfile.FastGFile(img_path, 'rb') as fid:
             encoded_jpg = fid.read()
@@ -171,32 +208,32 @@ def dicts_to_tf_example(dicts, root_dir, _set):
         occludeds.append(dataset_util.int64_list_feature(occluded))
         generateds.append(dataset_util.int64_list_feature(generated))
 
-    # Non sequential features
-    context = tf.train.Features(feature={
-        'video/folder': dataset_util.bytes_feature(folder.encode('utf8')),
-        'video/frame_number': dataset_util.int64_feature(len(imgs_path)),
-        'video/height': dataset_util.int64_feature(height),
-        'video/width': dataset_util.int64_feature(width),
-        })
-    # Sequential features
-    tf_feature_lists = {
-        'image/filename': tf.train.FeatureList(feature=filenames),
-        'image/encoded': tf.train.FeatureList(feature=encodeds),
-        'image/sources': tf.train.FeatureList(feature=sources),
-        'image/key/sha256': tf.train.FeatureList(feature=keys),
-        'image/format': tf.train.FeatureList(feature=formats),
-        'image/object/bbox/xmin': tf.train.FeatureList(feature=xmins),
-        'image/object/bbox/xmax': tf.train.FeatureList(feature=xmaxs),
-        'image/object/bbox/ymin': tf.train.FeatureList(feature=ymins),
-        'image/object/bbox/ymax': tf.train.FeatureList(feature=ymaxs),
-        'image/object/name': tf.train.FeatureList(feature=names),
-        'image/object/occluded': tf.train.FeatureList(feature=occludeds),
-        'image/object/generated': tf.train.FeatureList(feature=generateds),
-        }
-    feature_lists = tf.train.FeatureLists(feature_list=tf_feature_lists)
-    # Make single sequence example
-    tf_example = tf.train.SequenceExample(context=context, feature_lists=feature_lists)
-    return tf_example
+        # Non sequential features
+        context = tf.train.Features(feature={
+            'video/folder': dataset_util.bytes_feature(folder.encode('utf8')),
+            'video/frame_number': dataset_util.int64_feature(len(imgs_path)),
+            'video/height': dataset_util.int64_feature(height),
+            'video/width': dataset_util.int64_feature(width),
+            })
+        # Sequential features
+        tf_feature_lists = {
+            'image/filename': tf.train.FeatureList(feature=filenames),
+            'image/encoded': tf.train.FeatureList(feature=encodeds),
+            'image/sources': tf.train.FeatureList(feature=sources),
+            'image/key/sha256': tf.train.FeatureList(feature=keys),
+            'image/format': tf.train.FeatureList(feature=formats),
+            'bbox/xmin': tf.train.FeatureList(feature=xmins),
+            'bbox/xmax': tf.train.FeatureList(feature=xmaxs),
+            'bbox/ymin': tf.train.FeatureList(feature=ymins),
+            'bbox/ymax': tf.train.FeatureList(feature=ymaxs),
+            'image/object/name': tf.train.FeatureList(feature=names),
+            'image/object/occluded': tf.train.FeatureList(feature=occludeds),
+            'image/object/generated': tf.train.FeatureList(feature=generateds),
+            }
+        feature_lists = tf.train.FeatureLists(feature_list=tf_feature_lists)
+        # Make single sequence example
+        tf_example = tf.train.SequenceExample(context=context, feature_lists=feature_lists)
+        writer.write(tf_example.SerializeToString())
 
 def main(_):
     root_dir = FLAGS.root_dir
