@@ -1,12 +1,12 @@
 # tf-detectors
-Deep-Learning Based Detection Models for Practical Usages implemented in Tensorflow.
+tfrecord converter for LSTM Object Detection in tensorflow
 
-## Pretrained Weights
+## Usage
 
-To be updated
+cd tf-detectors/datasets/VID2015
 
-## Architectures
+python vid_2015_to_tfrecord.py \
+--root_dir=/path/to/VID2015_dataset/ILSVRC \
+--output_path=/path/to/vid2015_tfrecord
 
-### SSD: Single shot multibox detector
 
-### Mobile Video Object Detection with Temporally-Aware Feature Maps
